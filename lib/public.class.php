@@ -98,7 +98,7 @@ EOF;
      * @param view: return a view
      * @param parameters: return parameters to view
      */
-    public function viewrender ( $view, $parameters = array() ) {
+    public static function viewrender ( $view, $parameters = array() ) {
 
         include_once "view.hook.php"; // load view hooks
         $view_content = file_get_contents("../view/$view.html"); // load view content
