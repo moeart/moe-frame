@@ -4,73 +4,132 @@
  * Handle PHP errors and exceptions with configurable trace options
  */
 
+
+/**
+ * Get environment configuration value
+ * @param string $key Configuration key
+ * @param mixed $default Default value if key not found
+ * @return mixed Configuration value
+ */
+function mf_env_get($envname, $default = false) {
+    $envDotJson = dirname(dirname(__FILE__))."/env.json";
+    $envDotJson = json_decode(file_get_contents($envDotJson), true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        $errorMsg = "env.json Error: ".json_last_error_msg();
+        try {
+            $MoeApps = new MoeApps();
+            $MoeApps->abort(500, '', $errorMsg);
+        } catch (Exception $e) {
+            // If abort fails, output the error directly
+            header('HTTP/1.1 500 Internal Server Error');
+            echo "<pre>" . htmlspecialchars($errorMsg) . "</pre>";
+        }
+    }
+    if ($envDotJson && isset($envDotJson[$envname])) {
+        $value = $envDotJson[$envname];
+        return $value;
+    }
+    return $default;
+}
+
+/**
+ * Check if error should be handled by our error handler
+ * @param int $errno Error level
+ * @return bool Whether to handle this error
+ */
+function mf_should_handle_error($errno) {
+    // Don't handle suppressed errors (@ operator)
+    if (error_reporting() === 0) {
+        return false;
+    }
+    
+    // Only handle actual errors, not normal HTTP status codes
+    $error_levels = array(
+        E_ERROR, E_PARSE, E_CORE_ERROR, E_CORE_WARNING, 
+        E_COMPILE_ERROR, E_COMPILE_WARNING, E_USER_ERROR,
+        E_RECOVERABLE_ERROR
+    );
+    
+    return in_array($errno, $error_levels);
+}
+
 /**
  * Set PHP Error Handler
- * @return void
+ * @return bool
  */
 function mf_error_handler($errno, $errstr, $errfile, $errline) {
-    // Check if MoeApps class exists
+    // Check if this error should be handled
+    if (!mf_should_handle_error($errno)) {
+        return false; // Let PHP's default error handler deal with it
+    }
+    
+    // Check if MoeApps class exists and can be instantiated
     if (!class_exists('MoeApps')) {
         // If MoeApps is not available, use basic error handling
         header('HTTP/1.1 500 Internal Server Error');
         echo "Fatal Error: MoeApps class not available\n";
+        echo "Error: $errstr in $errfile on line $errline\n";
         exit(-1);
     }
     
-    $MoeApps = new MoeApps();
-    
-    // Get environment configuration with default values
-    $mf_trace = false;
-    $mf_debug = false;
-    
-    // Try to get configuration values if E() function is available
-    if (function_exists('E')) {
-        $config_trace = E('MF_TRACE');
-        $config_debug = E('MF_DEBUG');
-        
-        // Only override defaults if values are explicitly set
-        if ($config_trace !== null) {
-            $mf_trace = $config_trace;
-        }
-        if ($config_debug !== null) {
-            $mf_debug = $config_debug;
-        }
+    try {
+        $MoeApps = new MoeApps();
+    } catch (Exception $e) {
+        // If we can't instantiate MoeApps, fall back to basic error handling
+        header('HTTP/1.1 500 Internal Server Error');
+        echo "Fatal Error: Cannot instantiate MoeApps\n";
+        echo "Original Error: $errstr in $errfile on line $errline\n";
+        echo "Instantiation Error: " . $e->getMessage() . "\n";
+        exit(-1);
     }
     
-    // If both trace and debug are off, show minimal error message
-    if (!$mf_trace && !$mf_debug) {
-        $MoeApps->abort(500, '', '');
-        return true;
+    // Get environment configuration using mf_env_get
+    $mf_trace = mf_env_get('MF_TRACE', false);
+    $mf_debug = mf_env_get('MF_DEBUG', false);
+    
+    // Convert string values to boolean if needed
+    if (is_string($mf_trace)) {
+        $mf_trace = ($mf_trace === 'true' || $mf_trace === '1' || $mf_trace === 'on');
+    }
+    if (is_string($mf_debug)) {
+        $mf_debug = ($mf_debug === 'true' || $mf_debug === '1' || $mf_debug === 'on');
     }
     
-    // Format error message with trace
+    // Format error message
     $error_type = '';
     switch ($errno) {
         case E_ERROR: $error_type = 'ERROR'; break;
-        case E_WARNING: $error_type = 'WARNING'; break;
         case E_PARSE: $error_type = 'PARSE'; break;
-        case E_NOTICE: $error_type = 'NOTICE'; break;
         case E_CORE_ERROR: $error_type = 'CORE_ERROR'; break;
         case E_CORE_WARNING: $error_type = 'CORE_WARNING'; break;
         case E_COMPILE_ERROR: $error_type = 'COMPILE_ERROR'; break;
         case E_COMPILE_WARNING: $error_type = 'COMPILE_WARNING'; break;
         case E_USER_ERROR: $error_type = 'USER_ERROR'; break;
-        case E_USER_WARNING: $error_type = 'USER_WARNING'; break;
-        case E_USER_NOTICE: $error_type = 'USER_NOTICE'; break;
-        case E_STRICT: $error_type = 'STRICT'; break;
         case E_RECOVERABLE_ERROR: $error_type = 'RECOVERABLE_ERROR'; break;
-        case E_DEPRECATED: $error_type = 'DEPRECATED'; break;
-        case E_USER_DEPRECATED: $error_type = 'USER_DEPRECATED'; break;
         default: $error_type = 'UNKNOWN';
     }
     
-    // Build error message with trace
-    $trace_info = "$error_type: $errstr in $errfile on line $errline";
+    $error_message = "$error_type: $errstr in $errfile on line $errline";
+    
+    // If both trace and debug are off, show minimal error message
+    if (!$mf_trace && !$mf_debug) {
+        try {
+            $MoeApps->abort(500, '', '');
+        } catch (Exception $e) {
+            // If abort fails, use basic error display
+            header('HTTP/1.1 500 Internal Server Error');
+            echo "Internal Server Error";
+        }
+        return true;
+    }
+    
+    // Build detailed error information based on debug level
+    $detailed_info = $error_message;
     
     // If debug is on, show detailed stack trace
     if ($mf_debug) {
-        $backtrace = debug_backtrace();
-        $trace_info .= "\n\nStack trace:\n";
+        $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+        $detailed_info .= "\n\nStack trace:\n";
         
         // Remove the error handler itself from the trace
         array_shift($backtrace);
@@ -84,7 +143,7 @@ function mf_error_handler($errno, $errstr, $errfile, $errline) {
             $type = isset($trace['type']) ? $trace['type'] : '';
             
             $args_str = '';
-            if (isset($trace['args'])) {
+            if (isset($trace['args']) && $mf_debug) {
                 $args = array();
                 foreach ($trace['args'] as $arg) {
                     if (is_string($arg)) {
@@ -106,12 +165,12 @@ function mf_error_handler($errno, $errstr, $errfile, $errline) {
                 $args_str = implode(', ', $args);
             }
             
-            $trace_info .= "$i. $class$type$function($args_str) called at [$file:$line]\n";
+            $detailed_info .= "$i. $class$type$function($args_str) called at [$file:$line]\n";
         }
     } else if ($mf_trace) {
         // If only trace is on, show minimal trace information
-        $backtrace = debug_backtrace();
-        $trace_info .= "\n\nStack trace:\n";
+        $backtrace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+        $detailed_info .= "\n\nStack trace:\n";
         
         // Remove the error handler itself from the trace
         array_shift($backtrace);
@@ -124,14 +183,19 @@ function mf_error_handler($errno, $errstr, $errfile, $errline) {
             $class = isset($trace['class']) ? $trace['class'] : '';
             $type = isset($trace['type']) ? $trace['type'] : '';
             
-            $trace_info .= "$i. $class$type$function() called at [$file:$line]\n";
+            $detailed_info .= "$i. $class$type$function() called at [$file:$line]\n";
         }
     }
     
-    // Abort with 500 error and detailed trace
-    $MoeApps->abort(500, '', $trace_info);
+    // Abort with 500 error and detailed information
+    try {
+        $MoeApps->abort(500, '', $detailed_info);
+    } catch (Exception $e) {
+        // If abort fails, output the error directly
+        header('HTTP/1.1 500 Internal Server Error');
+        echo "<pre>" . htmlspecialchars($detailed_info) . "</pre>";
+    }
     
-    // Return true to prevent PHP's default error handler from running
     return true;
 }
 
@@ -140,47 +204,58 @@ function mf_error_handler($errno, $errstr, $errfile, $errline) {
  * @return void
  */
 function mf_exception_handler($exception) {
-    // Check if MoeApps class exists
+    // Check if MoeApps class exists and can be instantiated
     if (!class_exists('MoeApps')) {
         // If MoeApps is not available, use basic error handling
         header('HTTP/1.1 500 Internal Server Error');
         echo "Fatal Error: MoeApps class not available\n";
+        echo "Exception: " . $exception->getMessage() . "\n";
         exit(-1);
     }
     
-    $MoeApps = new MoeApps();
-    
-    // Get environment configuration with default values
-    $mf_trace = false;
-    $mf_debug = false;
-    
-    // Try to get configuration values if E() function is available
-    if (function_exists('E')) {
-        $config_trace = E('MF_TRACE');
-        $config_debug = E('MF_DEBUG');
-        
-        // Only override defaults if values are explicitly set
-        if ($config_trace !== null) {
-            $mf_trace = $config_trace;
-        }
-        if ($config_debug !== null) {
-            $mf_debug = $config_debug;
-        }
+    try {
+        $MoeApps = new MoeApps();
+    } catch (Exception $e) {
+        // If we can't instantiate MoeApps, fall back to basic error handling
+        header('HTTP/1.1 500 Internal Server Error');
+        echo "Fatal Error: Cannot instantiate MoeApps\n";
+        echo "Original Exception: " . $exception->getMessage() . "\n";
+        echo "Instantiation Error: " . $e->getMessage() . "\n";
+        exit(-1);
     }
     
-    // If both trace and debug are off, show minimal error message
-    if (!$mf_trace && !$mf_debug) {
-        $MoeApps->abort(500, '', '');
-        return;
+    // Get environment configuration using mf_env_get
+    $mf_trace = mf_env_get('MF_TRACE', false);
+    $mf_debug = mf_env_get('MF_DEBUG', false);
+    
+    // Convert string values to boolean if needed
+    if (is_string($mf_trace)) {
+        $mf_trace = ($mf_trace === 'true' || $mf_trace === '1' || $mf_trace === 'on');
+    }
+    if (is_string($mf_debug)) {
+        $mf_debug = ($mf_debug === 'true' || $mf_debug === '1' || $mf_debug === 'on');
     }
     
-    // Build exception message with trace
+    // Build exception message
     $exception_message = get_class($exception) . ": " . $exception->getMessage() . " in " . 
                          $exception->getFile() . " on line " . $exception->getLine();
     
+    // If both trace and debug are off, show minimal error message
+    if (!$mf_trace && !$mf_debug) {
+        try {
+            $MoeApps->abort(500, '', '');
+        } catch (Exception $e) {
+            header('HTTP/1.1 500 Internal Server Error');
+            echo "Internal Server Error";
+        }
+        return;
+    }
+    
+    $detailed_info = $exception_message;
+    
     // If debug is on, show detailed stack trace
     if ($mf_debug) {
-        $exception_message .= "\n\nStack trace:\n";
+        $detailed_info .= "\n\nStack trace:\n";
         
         // Format each trace entry
         $trace = $exception->getTrace();
@@ -214,11 +289,11 @@ function mf_exception_handler($exception) {
                 $args_str = implode(', ', $args);
             }
             
-            $exception_message .= "$i. $class$type$function($args_str) called at [$file:$line]\n";
+            $detailed_info .= "$i. $class$type$function($args_str) called at [$file:$line]\n";
         }
     } else if ($mf_trace) {
         // If only trace is on, show minimal trace information
-        $exception_message .= "\n\nStack trace:\n";
+        $detailed_info .= "\n\nStack trace:\n";
         
         // Format each trace entry with minimal information
         $trace = $exception->getTrace();
@@ -229,12 +304,17 @@ function mf_exception_handler($exception) {
             $class = isset($trace_entry['class']) ? $trace_entry['class'] : '';
             $type = isset($trace_entry['type']) ? $trace_entry['type'] : '';
             
-            $exception_message .= "$i. $class$type$function() called at [$file:$line]\n";
+            $detailed_info .= "$i. $class$type$function() called at [$file:$line]\n";
         }
     }
     
-    // Abort with 500 error and detailed exception trace
-    $MoeApps->abort(500, '', $exception_message);
+    // Abort with 500 error and detailed exception information
+    try {
+        $MoeApps->abort(500, '', $detailed_info);
+    } catch (Exception $e) {
+        header('HTTP/1.1 500 Internal Server Error');
+        echo "<pre>" . htmlspecialchars($detailed_info) . "</pre>";
+    }
 }
 
 /**
@@ -244,9 +324,14 @@ function mf_exception_handler($exception) {
 function mf_shutdown_function() {
     // Check if there was a fatal error
     $error = error_get_last();
-    if ($error !== null && in_array($error['type'], array(E_ERROR, E_PARSE, E_CORE_ERROR, E_CORE_WARNING, E_COMPILE_ERROR, E_COMPILE_WARNING))) {
+    if ($error !== null && mf_should_handle_error($error['type'])) {
         // Manually call error handler for fatal errors
         mf_error_handler($error['type'], $error['message'], $error['file'], $error['line']);
     }
 }
+
+// Register error handlers
+set_error_handler('mf_error_handler');
+set_exception_handler('mf_exception_handler');
+register_shutdown_function('mf_shutdown_function');
 ?>
