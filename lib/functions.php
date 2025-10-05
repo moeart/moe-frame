@@ -22,7 +22,14 @@ function E ( $envname ) {
             $envDotJson = dirname(dirname(__FILE__))."/env.json";
             $envDotJson = json_decode(file_get_contents($envDotJson), true);
             if ($envDotJson && isset($envDotJson[$envname])) {
-                return $envDotJson[$envname];
+                $value = $envDotJson[$envname];
+                // Process placeholder in string value, e.g. E('MOEFRAME_XXX')
+                if (is_string($value)) {
+                    $value = preg_replace_callback('/E\(\s*[\'"]([A-Z_]+)[\'"]\s*\)/', function($matches) {
+                        return E($matches[1]);
+                    }, $value);
+                }
+                return $value;
             }
             return null;
         
