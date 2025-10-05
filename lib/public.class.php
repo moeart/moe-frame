@@ -54,7 +54,7 @@ class MoeApps {
      */
     public function abort ( $code, $view = '', $msg = '' ) {
     
-        MoeApps::header($code);
+        $this->header($code);
         switch ( $code ) {
             
             case 403: $error = 'Forbidden'; break;
@@ -97,7 +97,7 @@ class MoeApps {
 EOF;
             print $template;
         } else {
-            MoeApps::viewrender($view, array(
+            $this->viewrender($view, array(
                 'code' => $code,
                 'error' => $error
             ));

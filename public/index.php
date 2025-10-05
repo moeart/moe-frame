@@ -19,6 +19,6 @@ foreach (glob("../conf/*.php") as $filename) {
     require_once $filename;
 }
 
-
-MoeApps::abort(404, '', 'Route Not Found!');
+$MoeApps = new MoeApps();
+$MoeApps->abort(404, '', 'Route Not Found!');
 ?>

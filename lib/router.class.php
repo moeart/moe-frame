@@ -1,6 +1,12 @@
 <?php
 class MoeRouter {
 
+    private $MoeApps;
+
+    function __construct() {
+        $this->MoeApps = new MoeApps();
+    }
+
     /**
      * Main Router
      * @param route: route string
@@ -24,7 +30,7 @@ class MoeRouter {
                 $func = array(new $funcArr[0], $funcArr[1]);
             }
             if ( !is_callable( $func ) ) // is controller exist?
-                MoeApps::abort(500, '', 'Controller Not Exist!');
+                $this->MoeApps->abort(500, '', 'Controller Not Exist!');
             else
                 call_user_func( $func );
                 
@@ -75,7 +81,7 @@ class MoeRouter {
                         }
                     }
                     if (!$cidrMatched) {
-                        MoeApps::abort(403, ''
+                        $this->MoeApps->abort(403, ''
                         ,"IP Address: $srcIpAddr is not ALLOWED, \nPlease contact IT administrator of company!");
                     }
                     break;
@@ -91,7 +97,7 @@ class MoeRouter {
                         }
                     }
                     if (!$hostMatched) {
-                        MoeApps::abort(404, '', 'Route in specified host was Not Found!');
+                        $this->MoeApps->abort(404, '', 'Route in specified host was Not Found!');
                     }
                     break;
 
