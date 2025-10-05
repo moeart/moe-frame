@@ -65,8 +65,10 @@ class MoeApps {
             
         }
         
-        //print $msg; // print debug message
-        
+        // Render debug message if available
+        $msgview = $msg == '' ? '' : "<pre class=\"debug\">DEBUG Trace:\n$msg</pre>";
+
+        // Render default view if view is not specified
         if ( $view == '' ) {
         $template = <<<EOF
 <!DOCTYPE html>
@@ -87,7 +89,7 @@ class MoeApps {
 <body>
     <div id="content">
         <div class="title">Oops, $error !</div>
-        <pre class="debug">DEBUG Trace:\n$msg</pre>
+        $msgview
         <div class="version">
             Error $code, Please try <a href="javascript:window.location.reload()">reload</a> page.
         </div>

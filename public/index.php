@@ -4,10 +4,30 @@
  * unstable version
  */
  
+// Turn off all error reporting temporarily
+error_reporting(0);
+ini_set('display_errors', 0);
+ 
 // Load Libraries
 foreach (glob("../lib/*.php") as $filename) {
     require_once $filename;
 }
+
+// Register custom error handlers after loading libraries
+// Set custom error handler
+set_error_handler('mf_error_handler');
+
+// Set custom exception handler
+set_exception_handler('mf_exception_handler');
+
+// Set custom shutdown function
+register_shutdown_function('mf_shutdown_function');
+
+// Set error reporting level (show all errors except notices)
+error_reporting(E_ALL & ~E_NOTICE);
+
+// Do not display errors directly (they will be handled by our custom handler)
+ini_set('display_errors', 0);
 
 // Load Apps
 foreach (glob("../app/*.php") as $filename) {
