@@ -11,6 +11,18 @@ class MoeApps {
         exit(0);
         
     }
+
+    /**
+     * Return Json Body
+     * @param $content: body content
+     */
+    public function json( $content ) {
+    
+        header('Content-Type: application/json; charset=utf-8');
+        print json_encode($content);
+        exit(0);
+        
+    }
     
     /**
      * Return Http Code
@@ -53,7 +65,7 @@ class MoeApps {
             
         }
         
-        print $msg; // print debug message
+        //print $msg; // print debug message
         
         if ( $view == '' ) {
         $template = <<<EOF
@@ -65,15 +77,17 @@ class MoeApps {
     <style>
     body {margin: 0; padding: 0; background-color: #F0F0F0;}
     #content {position: absolute; top: 0; bottom: 0; left: 0; right: 0; margin: auto;
-        height: 110px; width: 100%; text-align: center; color: #555; }
+        height: fit-content; width: 100%; text-align: center; color: #555; }
     a {color: #555;}
     .title {font-size: 64px;}
+    .debug {font-size: 14px; padding: 10px 20px; background: #333; color: #eee; display: inline-block; text-align: left; min-width: 500px;}
     .version {margin-top: 5px;}
     </style>
 </head>
 <body>
     <div id="content">
         <div class="title">Oops, $error !</div>
+        <pre class="debug">DEBUG Trace:\n$msg</pre>
         <div class="version">
             Error $code, Please try <a href="javascript:window.location.reload()">reload</a> page.
         </div>
@@ -113,6 +127,42 @@ EOF;
         
         eval("?>" . $view_content . "<?php ");
 
+    }
+
+    /**
+     * Get POST body of JSON type
+     * @return Object JSON Object
+     */
+    public function jsonbody() {
+    
+        return json_decode(file_get_contents("php://input"));
+        
+    }
+
+    /**
+     * Get COOKIES from http request
+     * @return Array COOKIE Array
+     */
+    public function cookie() {
+
+        $headerCookies = explode('; ', getallheaders()['Cookie']);
+        $cookies = [];
+        foreach($headerCookies as $itm) {
+            list($key, $val) = explode('=', $itm, 2);
+            $cookies[$key] = $val;
+        }
+        return $cookies;
+
+    }
+
+    /**
+     * Show empty response
+     */
+    public function empty($code = 200) {
+    
+        header("HTTP/1.1 $code OK");
+        die();
+        
     }
 
 }
