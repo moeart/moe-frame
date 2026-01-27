@@ -16,30 +16,41 @@ if (php_sapi_name() !== 'cli') {
     die("This script must be run in CLI mode\n");
 }
 
-// 初始化MoeFrame框架（用于命令行环境）
+// 定义项目根目录常量
+define('PROJECT_ROOT', dirname(__FILE__));
+define('PUBLIC_DIR', PROJECT_ROOT . '/public');
+
+/**
+ * 初始化MoeFrame框架（用于命令行环境）
+ */
 function initializeMoeFrame() {
-    // 定义根目录
-    $rootDir = dirname(__FILE__);
-    
     // 加载框架核心库
-    foreach (glob($rootDir . "/lib/*.php") as $filename) {
+    $libFiles = PROJECT_ROOT . "\lib\*.php";
+    foreach (glob($libFiles) as $filename) {
         require_once $filename;
     }
     
     // 加载应用
-    foreach (glob($rootDir . "/app/*.php") as $filename) {
+    $appFiles = PROJECT_ROOT . "\app\*.php";
+    foreach (glob($appFiles) as $filename) {
+        require_once $filename;
+    }
+    
+    // 加载配置文件
+    $confFiles = PROJECT_ROOT . "\conf\*.php";
+    foreach (glob($confFiles) as $filename) {
         require_once $filename;
     }
     
     // 创建路由实例
     global $MoeRouter;
     $MoeRouter = new MoeRouter();
-    
-    // 加载路由配置
-    require_once $rootDir . "/conf/route.inc.php";
 }
 
-// 解析命令行参数
+/**
+ * 解析命令行参数
+ * @return array
+ */
 function parseCommandLineArgs() {
     $shortopts = "l:p:";
     $longopts = ["listen:", "port:"];
@@ -68,7 +79,12 @@ function parseCommandLineArgs() {
     return $args;
 }
 
-// 检查端口是否被占用
+/**
+ * 检查端口是否被占用
+ * @param string $listen
+ * @param int $port
+ * @return bool
+ */
 function checkPort($listen, $port) {
     $socket = @fsockopen($listen, $port, $errno, $errstr, 1);
     if ($socket) {
@@ -78,7 +94,11 @@ function checkPort($listen, $port) {
     return true; // 端口可用
 }
 
-// 启动PHP内置服务器
+/**
+ * 启动PHP内置服务器
+ * @param string $listen
+ * @param int $port
+ */
 function startPHPServer($listen, $port) {
     // 检查端口是否可用
     if (!checkPort($listen, $port)) {
@@ -86,24 +106,18 @@ function startPHPServer($listen, $port) {
         exit(1);
     }
     
-    // 获取项目根目录
-    $rootDir = dirname(__FILE__);
-    
-    // 设置public目录为文档根目录
-    $publicDir = $rootDir . '/public';
-    
     echo "======================================================\n";
     echo "  MoeFrame Development Server (maidchan)\n";
     echo "======================================================\n";
     echo "  Starting server...\n";
     echo "  Listening on http://{$listen}:{$port}\n";
-    echo "  Document root: {$publicDir}\n";
+    echo "  Document root: " . PUBLIC_DIR . "\n";
     echo "  Entry point: index.php\n";
     echo "  Press Ctrl+C to stop the server\n";
     echo "======================================================\n\n";
     
     // 启动PHP内置服务器，直接使用public/index.php作为入口点
-    $command = "php -S {$listen}:{$port} -t {$publicDir}";
+    $command = "php -S {$listen}:{$port} -t " . PUBLIC_DIR;
     
     echo "  Running command: {$command}\n\n";
     
@@ -111,7 +125,50 @@ function startPHPServer($listen, $port) {
     passthru($command);
 }
 
-// 主函数
+/**
+ * 运行计划任务
+ */
+function runCrontab() {
+    // 切换到public目录
+    chdir(PUBLIC_DIR);
+    
+    // 初始化框架
+    initializeMoeFrame();
+    
+    echo "======================================================\n";
+    echo "  MoeFrame Crontab Runner (maidchan)\n";
+    echo "======================================================\n";
+    echo "  Running scheduled tasks...\n";
+    echo "  Time: " . date('Y-m-d H:i:s') . "\n";
+    echo "  Working directory: " . getcwd() . "\n";
+    echo "======================================================\n\n";
+    
+    // 执行计划任务
+    global $MoeCrontab;
+    if (isset($MoeCrontab)) {
+        $tasks = $MoeCrontab->getTasks();
+        echo "  Found " . count($tasks) . " scheduled tasks\n\n";
+        
+        foreach ($tasks as $task) {
+            if ($MoeCrontab->shouldRun($task['expression'])) {
+                echo "  Running task: " . $task['command'] . " (" . $task['expression'] . ")\n";
+                $MoeCrontab->execute($task['command']);
+            } else {
+                echo "  Skipping task: " . $task['command'] . " (" . $task['expression'] . ")\n";
+            }
+        }
+    } else {
+        echo "  Error: MoeCrontab instance not found\n";
+    }
+    
+    echo "\n======================================================\n";
+    echo "  Crontab run completed\n";
+    echo "======================================================\n";
+}
+
+/**
+ * 主函数
+ */
 function main() {
     // 获取命令
     $argv = $_SERVER['argv'];
@@ -122,7 +179,8 @@ function main() {
         echo "Usage: php maidchan <command> [options]\n";
         echo "\n";
         echo "Available commands:\n";
-        echo "  run    Start development server\n";
+        echo "  run            Start development server\n";
+        echo "  crontab:run    Run scheduled tasks\n";
         echo "\n";
         echo "Options for run:\n";
         echo "  -l, --listen    Specify listen address (default: 0.0.0.0)\n";
@@ -133,6 +191,7 @@ function main() {
         echo "  php maidchan run -l 127.0.0.1\n";
         echo "  php maidchan run -p 8888\n";
         echo "  php maidchan run -l 127.0.0.1 -p 8888\n";
+        echo "  php maidchan crontab:run\n";
         exit(1);
     }
     
@@ -142,6 +201,9 @@ function main() {
         case 'run':
             $args = parseCommandLineArgs();
             startPHPServer($args['listen'], $args['port']);
+            break;
+        case 'crontab:run':
+            runCrontab();
             break;
         default:
             echo "Unknown command: {$command}\n";
