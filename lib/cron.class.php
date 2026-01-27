@@ -1,15 +1,15 @@
 <?php
 /**
- * MoeCrontab 类
- * 用于处理 Linux 风格的计划任务
+ * MoeCrontab Class
+ * For handling Linux-style scheduled tasks
  */
 class MoeCrontab {
     private $tasks = [];
     
     /**
-     * 添加计划任务
-     * @param string $cronExpression Linux 风格的 cron 表达式
-     * @param string $command 要执行的命令，格式为 "App@Method"
+     * Add scheduled task
+     * @param string $cronExpression Linux-style cron expression
+     * @param string $command Command to execute, format: "App@Method"
      * @return $this
      */
     public function C($cronExpression, $command) {
@@ -21,7 +21,7 @@ class MoeCrontab {
     }
     
     /**
-     * 获取所有计划任务
+     * Get all scheduled tasks
      * @return array
      */
     public function getTasks() {
@@ -29,7 +29,7 @@ class MoeCrontab {
     }
     
     /**
-     * 检查指定的 cron 表达式是否应该在当前时间执行
+     * Check if the specified cron expression should run at current time
      * @param string $cronExpression
      * @return bool
      */
@@ -42,27 +42,27 @@ class MoeCrontab {
         list($minute, $hour, $dayOfMonth, $month, $dayOfWeek) = $parts;
         $now = time();
         
-        // 检查分钟
+        // Check minute
         if (!$this->match($minute, date('i', $now))) {
             return false;
         }
         
-        // 检查小时
+        // Check hour
         if (!$this->match($hour, date('H', $now))) {
             return false;
         }
         
-        // 检查日
+        // Check day of month
         if (!$this->match($dayOfMonth, date('d', $now))) {
             return false;
         }
         
-        // 检查月
+        // Check month
         if (!$this->match($month, date('m', $now))) {
             return false;
         }
         
-        // 检查星期
+        // Check day of week
         if (!$this->match($dayOfWeek, date('w', $now))) {
             return false;
         }
@@ -71,7 +71,7 @@ class MoeCrontab {
     }
     
     /**
-     * 检查值是否匹配 cron 表达式的部分
+     * Check if value matches cron expression part
      * @param string $expressionPart
      * @param string $value
      * @return bool
@@ -85,7 +85,7 @@ class MoeCrontab {
             list($range, $step) = explode('/', $expressionPart);
             if ($range == '*') {
                 $start = 0;
-                $end = ($value < 24) ? 59 : 31; // 分钟或小时的最大值
+                $end = ($value < 24) ? 59 : 31; // Max value for minutes or hours
             } else {
                 list($start, $end) = explode('-', $range);
             }
@@ -112,7 +112,7 @@ class MoeCrontab {
     }
     
     /**
-     * 运行所有应该在当前时间执行的任务
+     * Run all tasks that should execute at current time
      */
     public function run() {
         foreach ($this->tasks as $task) {
@@ -123,13 +123,13 @@ class MoeCrontab {
     }
     
     /**
-     * 执行指定的命令
+     * Execute specified command
      * @param string $command
      */
     public function execute($command) {
         list($app, $method) = explode('@', $command);
         
-        // 尝试加载应用类并执行方法
+        // Try to load application class and execute method
         $appFile = __DIR__ . '/../app/' . $app . '.php';
         if (file_exists($appFile)) {
             require_once $appFile;

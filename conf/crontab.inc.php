@@ -1,13 +1,13 @@
 <?php
 /**
- * Linux 风格的计划任务配置文件
+ * Crontab Configuration
  */
 
-// 创建 MoeCrontab 实例
+// Create MoeCrontab instance
 global $MoeCrontab;
 $MoeCrontab = new MoeCrontab();
 
-// 示例规则：每5分钟执行一次 ExampleApp@Hello
-$MoeCrontab->C('* * * * *', 'ExampleApp@Hello');
+// Add a crontab job: every 5 minutes, run ExampleApp@Hello
+$MoeCrontab->C('*/5 * * * *', 'ExampleApp@Hello');
 
 ?>

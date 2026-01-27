@@ -1,54 +1,54 @@
 #!/usr/bin/env php
 <?php
 /**
- * MoeFrame 框架的 maidchan 脚本工具
- * 用于启动开发服务器并处理路由
+ * MoeFrame maidchan script tool
+ * Used to start development server and handle routing
  * 
- * 使用方法:
- *   php maidchan run               - 在默认地址 0.0.0.0:8000 启动开发服务器
- *   php maidchan run -l 127.0.0.1  - 在指定地址 127.0.0.1:8000 启动开发服务器
- *   php maidchan run -p 8888       - 在默认地址 0.0.0.0:8888 启动开发服务器
- *   php maidchan run -l 127.0.0.1 -p 8888 - 在指定地址 127.0.0.1:8888 启动开发服务器
+ * Usage:
+ *   php maidchan run               - Start development server at default address 0.0.0.0:8000
+ *   php maidchan run -l 127.0.0.1  - Start development server at specified address 127.0.0.1:8000
+ *   php maidchan run -p 8888       - Start development server at default address 0.0.0.0:8888
+ *   php maidchan run -l 127.0.0.1 -p 8888 - Start development server at specified address 127.0.0.1:8888
  */
 
-// 检查是否在CLI模式下运行
+// Check if running in CLI mode
 if (php_sapi_name() !== 'cli') {
     die("This script must be run in CLI mode\n");
 }
 
-// 定义项目根目录常量
+// Define project root directory constants
 define('PROJECT_ROOT', dirname(__FILE__));
 define('PUBLIC_DIR', PROJECT_ROOT . '/public');
 
 /**
- * 初始化MoeFrame框架（用于命令行环境）
+ * Initialize MoeFrame framework (for CLI environment)
  */
 function initializeMoeFrame() {
-    // 加载框架核心库
+    // Load framework core library
     $libFiles = PROJECT_ROOT . "\lib\*.php";
     foreach (glob($libFiles) as $filename) {
         require_once $filename;
     }
     
-    // 加载应用
+    // Load applications
     $appFiles = PROJECT_ROOT . "\app\*.php";
     foreach (glob($appFiles) as $filename) {
         require_once $filename;
     }
     
-    // 加载配置文件
+    // Load configuration files
     $confFiles = PROJECT_ROOT . "\conf\*.php";
     foreach (glob($confFiles) as $filename) {
         require_once $filename;
     }
     
-    // 创建路由实例
+    // Create router instance
     global $MoeRouter;
     $MoeRouter = new MoeRouter();
 }
 
 /**
- * 解析命令行参数
+ * Parse command line arguments
  * @return array
  */
 function parseCommandLineArgs() {
@@ -57,13 +57,13 @@ function parseCommandLineArgs() {
     
     $options = getopt($shortopts, $longopts);
     
-    // 默认参数
+    // Default parameters
     $args = [
         'listen' => '0.0.0.0',
         'port' => 8000
     ];
     
-    // 处理命令行参数
+    // Process command line arguments
     if (isset($options['l'])) {
         $args['listen'] = $options['l'];
     } elseif (isset($options['listen'])) {
@@ -80,7 +80,7 @@ function parseCommandLineArgs() {
 }
 
 /**
- * 检查端口是否被占用
+ * Check if port is occupied
  * @param string $listen
  * @param int $port
  * @return bool
@@ -89,18 +89,18 @@ function checkPort($listen, $port) {
     $socket = @fsockopen($listen, $port, $errno, $errstr, 1);
     if ($socket) {
         fclose($socket);
-        return false; // 端口已被占用
+        return false; // Port is occupied
     }
-    return true; // 端口可用
+    return true; // Port is available
 }
 
 /**
- * 启动PHP内置服务器
+ * Start PHP built-in server
  * @param string $listen
  * @param int $port
  */
 function startPHPServer($listen, $port) {
-    // 检查端口是否可用
+    // Check if port is available
     if (!checkPort($listen, $port)) {
         echo "Error: Port {$port} is already in use\n";
         exit(1);
@@ -116,23 +116,23 @@ function startPHPServer($listen, $port) {
     echo "  Press Ctrl+C to stop the server\n";
     echo "======================================================\n\n";
     
-    // 启动PHP内置服务器，直接使用public/index.php作为入口点
+    // Start PHP built-in server, using public/index.php as entry point
     $command = "php -S {$listen}:{$port} -t " . PUBLIC_DIR;
     
     echo "  Running command: {$command}\n\n";
     
-    // 执行命令并保持运行
+    // Execute command and keep running
     passthru($command);
 }
 
 /**
- * 运行计划任务
+ * Run scheduled tasks
  */
 function runCrontab() {
-    // 切换到public目录
+    // Switch to public directory
     chdir(PUBLIC_DIR);
     
-    // 初始化框架
+    // Initialize framework
     initializeMoeFrame();
     
     echo "======================================================\n";
@@ -143,7 +143,7 @@ function runCrontab() {
     echo "  Working directory: " . getcwd() . "\n";
     echo "======================================================\n\n";
     
-    // 执行计划任务
+    // Execute scheduled tasks
     global $MoeCrontab;
     if (isset($MoeCrontab)) {
         $tasks = $MoeCrontab->getTasks();
@@ -167,10 +167,10 @@ function runCrontab() {
 }
 
 /**
- * 主函数
+ * Main function
  */
 function main() {
-    // 获取命令
+    // Get command
     $argv = $_SERVER['argv'];
     
     if (count($argv) < 2) {
@@ -212,5 +212,5 @@ function main() {
     }
 }
 
-// 运行主函数
+// Run main function
 main();
