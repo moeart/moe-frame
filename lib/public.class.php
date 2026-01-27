@@ -147,7 +147,18 @@ EOF;
      */
     public function cookie() {
 
-        $headerCookies = explode('; ', getallheaders()['Cookie']);
+        // Check if running in CLI mode
+        if (PHP_SAPI === 'cli') {
+            return $_COOKIE;
+        }
+
+        // In HTTP environment, use getallheaders() to get Cookie header
+        $headers = getallheaders();
+        if (!isset($headers['Cookie'])) {
+            return $_COOKIE;
+        }
+
+        $headerCookies = explode('; ', $headers['Cookie']);
         $cookies = [];
         foreach($headerCookies as $itm) {
             list($key, $val) = explode('=', $itm, 2);
