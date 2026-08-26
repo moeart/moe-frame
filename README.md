@@ -399,6 +399,33 @@ $MoeRouter->H([
 });
 ```
 
+### Global Middleware
+
+Framework-level middleware definitions are loaded automatically from `middleware/*.php` before routes are dispatched. Each file returns one definition (or a list of definitions) and uses `map.routes` to match the request **path** with PCRE regular expressions. For matching middleware, `before` handlers run in file-name order, the controller output is captured, and `after` handlers run in reverse order. Unmatched routes retain their existing behavior.
+
+```php
+// middleware/crypto.php
+return [
+    'map' => [
+        'routes' => ['#^/api/secure(?:/.*)?$#'],
+    ],
+    'before' => function (&$ctx) {
+        // Read: reqheaders, reqbody, cookie, method, path, uri and route.
+        $ctx['respheaders']['X-Trace'] = 'accepted';
+        $ctx['set_cookies'][] = [
+            'name' => 'trace', 'value' => '1', 'path' => '/',
+            'httponly' => true, 'samesite' => 'Lax',
+        ];
+    },
+    'after' => function (&$ctx) {
+        // Write: respbody, respheaders, set_cookies and status.
+        $ctx['respbody'] .= "\\n<!-- processed -->";
+    },
+];
+```
+
+To return a response without executing the controller, set `respbody`, optionally set `status`, and set `$ctx['stop'] = true` in `before`. `respheaders` maps header names to one value or an array of values; `set_cookies` accepts an array of cookie definitions. The framework sends these values after `after` middleware finishes.
+
 ### Middleware Types
 
 MoeFrame supports several middleware types:

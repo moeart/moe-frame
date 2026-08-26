@@ -31,6 +31,9 @@ $MoeRouter->R('/middleware/cidr', 'ExampleApp@Hello', [
     ]
 ]);
 
+// For global middleware demonstration. The crypto middleware targets only this route.
+$MoeRouter->R('/middleware/crypto', 'ExampleApp@Hello');
+
 // For regular. (lower)
 $MoeRouter->R('/', 'ExampleApp@Hello');
 $MoeRouter->R('/hello', 'ExampleApp@Hello');

@@ -2,13 +2,24 @@
 class MoeApps {
 
     /**
+     * Complete a response. During global middleware execution, an exception
+     * returns control to the dispatcher so after-middleware can run.
+     */
+    private function finishResponse($exitCode = 0) {
+        if (class_exists('MoeGlobalMiddleware') && MoeGlobalMiddleware::isCapturing()) {
+            MoeGlobalMiddleware::completeResponse();
+        }
+        exit($exitCode);
+    }
+
+    /**
      * Direct Show or ECHO
      * @param $content: body content
      */
     public function directshow( $content ) {
     
         print $content;
-        exit(0);
+        $this->finishResponse(0);
         
     }
 
@@ -20,7 +31,7 @@ class MoeApps {
     
         header('Content-Type: application/json; charset=utf-8');
         print json_encode($content);
-        exit(0);
+        $this->finishResponse(0);
         
     }
     
@@ -105,7 +116,7 @@ EOF;
             ));
         }
         
-        exit(-1);
+        $this->finishResponse(-1);
 
     }
     
@@ -174,7 +185,7 @@ EOF;
     public function empty($code = 200) {
     
         header("HTTP/1.1 $code OK");
-        die();
+        $this->finishResponse(0);
         
     }
 

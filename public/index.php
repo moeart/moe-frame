@@ -41,6 +41,10 @@ foreach (glob("../conf/*.php") as $filename) {
         require_once $filename;
     }
 }
+// Load framework-level global middleware definitions before route dispatch.
+// Each middleware file may select routes using regular expressions.
+MoeGlobalMiddleware::loadDirectory(__DIR__ . '/../middleware');
+
 // Create Router instance and load routes from route.inc.php
 global $MoeRouter;
 $MoeRouter = new MoeRouter();

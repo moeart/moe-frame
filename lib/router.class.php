@@ -32,7 +32,7 @@ class MoeRouter {
             if ( !is_callable( $func ) ) // is controller exist?
                 $this->MoeApps->abort(500, '', 'Controller Not Exist!');
             else
-                call_user_func( $func );
+                MoeGlobalMiddleware::dispatch($func, $route);
                 
             exit(0);
         }
