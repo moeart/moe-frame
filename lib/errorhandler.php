@@ -38,8 +38,8 @@ function mf_env_get($envname, $default = false) {
  * @return bool Whether to handle this error
  */
 function mf_should_handle_error($errno) {
-    // Don't handle suppressed errors (@ operator)
-    if (error_reporting() === 0) {
+    // PHP 8 keeps an error-level mask while evaluating @-suppressed expressions.
+    if (!(error_reporting() & $errno)) {
         return false;
     }
     
