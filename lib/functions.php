@@ -1,5 +1,27 @@
 <?php
 /**
+ * Ensure a framework-owned storage directory exists before it is returned to
+ * application code. Concurrent PHP-CGI/FPM requests may race on first use;
+ * the second is_dir() check accepts a directory created by another process.
+ *
+ * @param string $directory
+ * @return string
+ */
+function MoeEnsureStorageDirectory($directory) {
+    $directory = (string) $directory;
+    if ($directory === '') {
+        throw new RuntimeException('MoeFrame storage directory path cannot be empty.');
+    }
+    if (is_dir($directory)) {
+        return $directory;
+    }
+    if (!@mkdir($directory, 0775, true) && !is_dir($directory)) {
+        throw new RuntimeException('Unable to create MoeFrame storage directory: ' . $directory);
+    }
+    return $directory;
+}
+
+/**
  * Environment Get
  * @param $envname: Environment Lable
  */
@@ -15,8 +37,10 @@ function E ( $envname ) {
         
         case 'MOEFRAME_ROOT': return dirname(dirname(__FILE__));
         case 'MOEFRAME_VENDOR': return dirname(dirname(__FILE__)).$SLASHES."vendor";
-        case 'MOEFRAME_STORAGE': return dirname(dirname(__FILE__)).$SLASHES."storage";
-        case 'MOEFRAME_TMP_ROOT': return dirname(dirname(__FILE__)).$SLASHES."storage".$SLASHES."tmp";
+        case 'MOEFRAME_STORAGE':
+            return MoeEnsureStorageDirectory(dirname(dirname(__FILE__)).$SLASHES."storage");
+        case 'MOEFRAME_TMP_ROOT':
+            return MoeEnsureStorageDirectory(dirname(dirname(__FILE__)).$SLASHES."storage".$SLASHES."tmp");
         default: 
             // Read from env.json file
             $envDotJson = dirname(dirname(__FILE__))."/env.json";
