@@ -21,6 +21,8 @@ class MoeGlobalMiddleware {
 
     private static $definitions = [];
     private static $capturing = false;
+    private static $streaming = false;
+    private static $captureBufferLevel = 0;
 
     /**
      * Load every PHP middleware definition under one directory.
@@ -72,6 +74,30 @@ class MoeGlobalMiddleware {
     }
 
     /**
+     * Release only the dispatcher-owned output buffer so a transparent proxy
+     * can flush response chunks while after-middleware remains available.
+     */
+    public static function beginStreamingResponse() {
+        if (!self::$capturing || self::$streaming) {
+            return self::$streaming;
+        }
+        // Never mark the response as streaming unless the dispatcher-owned
+        // buffer was actually removed. PHP/FastCGI output handlers may refuse
+        // ob_end_flush(); marking streaming anyway would skip both ob_get_clean
+        // and the final print(), yielding a successful response with no body.
+        if (self::$captureBufferLevel <= 0 || ob_get_level() < self::$captureBufferLevel) {
+            return false;
+        }
+        while (ob_get_level() >= self::$captureBufferLevel) {
+            if (!@ob_end_flush()) {
+                return false;
+            }
+        }
+        self::$streaming = true;
+        return true;
+    }
+
+    /**
      * Replace exit/die used by MoeApps response helpers while capturing.
      */
     public static function completeResponse() {
@@ -92,17 +118,22 @@ class MoeGlobalMiddleware {
         }
 
         self::$capturing = true;
+        self::$streaming = false;
+        self::$captureBufferLevel = 0;
         $body = '';
         try {
             self::runPhase($matched, 'before', $context);
 
             ob_start();
+            self::$captureBufferLevel = ob_get_level();
             if (empty($context['stop'])) {
                 call_user_func($controller);
             }
-            $body = ob_get_clean();
+            if (!self::$streaming && ob_get_level() >= self::$captureBufferLevel) {
+                $body = ob_get_clean();
+            }
         } catch (MoeMiddlewareResponseComplete $exception) {
-            if (ob_get_level() > 0) {
+            if (!self::$streaming && self::$captureBufferLevel > 0 && ob_get_level() >= self::$captureBufferLevel) {
                 $body = ob_get_clean();
             }
         } finally {
@@ -117,7 +148,11 @@ class MoeGlobalMiddleware {
 
         self::runPhase(array_reverse($matched), 'after', $context);
         self::applyResponse($context);
-        print (string)$context['respbody'];
+        if (!self::$streaming) {
+            print (string)$context['respbody'];
+        }
+        self::$streaming = false;
+        self::$captureBufferLevel = 0;
     }
 
     /**
